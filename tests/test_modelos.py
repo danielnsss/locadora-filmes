@@ -3,7 +3,7 @@ import unittest
 
 from modelos.filme import Filme
 from modelos.cliente import Cliente
-
+from modelos.aluguel import Aluguel
 
 class TestFilme(unittest.TestCase):
 
@@ -56,6 +56,43 @@ class TestCliente(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     Cliente(id, nome, telefone)
 
+class TestAluguel(unittest.TestCase):
+
+    def test_criacao_aluguel_ativo(self):
+        aluguel = Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0)
+
+        self.assertEqual(aluguel.id, 1)
+        self.assertEqual(aluguel.filme_id, 1)
+        self.assertEqual(aluguel.cliente_id, 1)
+        self.assertEqual(aluguel.status, "ativo")
+        self.assertIsNone(aluguel.data_devolucao_real)
+        self.assertEqual(aluguel.valor_total, 15.0)
+
+    def test_criacao_aluguel_devolvido(self):
+        aluguel = Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0, status="devolvido", data_devolucao_real="2026-09-26")
+
+        self.assertEqual(aluguel.status, "devolvido")
+        self.assertEqual(aluguel.data_devolucao_real, "2026-09-26")
+
+    def test_conversao_json_aluguel(self):
+        aluguel = Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0)
+
+        dados = aluguel.to_dict()
+        aluguel_recuperado = Aluguel.from_dict(dados)
+
+        self.assertEqual(aluguel_recuperado.to_dict(), dados)
+
+    def test_status_invalido_aluguel(self):
+        with self.assertRaises(ValueError):
+            Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0, status="cancelado")
+
+    def test_aluguel_ativo_com_data_devolucao(self):
+        with self.assertRaises(ValueError):
+            Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0, status="ativo", data_devolucao_real="2026-09-26")
+
+    def test_aluguel_devolvido_sem_data(self):
+        with self.assertRaises(ValueError):
+            Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0, status="devolvido")
 
 if __name__ == "__main__":
     unittest.main()
