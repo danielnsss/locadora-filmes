@@ -1,9 +1,12 @@
-
 import json
 import os
 import tempfile
 
 from pathlib import Path
+
+from modelos.aluguel import Aluguel
+from modelos.cliente import Cliente
+from modelos.filme import Filme
 
 
 class JSONRepository:
@@ -20,6 +23,13 @@ class JSONRepository:
             "alugueis": self.diretorio_dados / "alugueis.json"
         }
 
+        self.modelos = {"filmes": Filme, "clientes": Cliente, "alugueis": Aluguel}
+        self.campos = {
+            "filmes": {"id", "titulo", "genero", "ano", "sinopse", "preco_diaria", "quantidade_total", "quantidade_disponivel"},
+            "clientes": {"id", "nome", "telefone"},
+            "alugueis": {"id", "filme_id", "cliente_id", "data_aluguel", "data_devolucao_prevista", "data_devolucao_real", "valor_total", "status"}
+        }
+
         for caminho in self.arquivos.values():
             if not caminho.exists():
                 with caminho.open("x", encoding="utf-8") as arquivo:
@@ -31,25 +41,38 @@ class JSONRepository:
 
         return self.arquivos[tipo]
 
-    def _validar_registros(self, registros):
+    def _validar_registros(self, registros, tipo):
         if not isinstance(registros, list):
             raise ValueError("Os registros devem formar uma lista.")
 
         ids = set()
 
-        for registro in registros:
+        for indice, registro in enumerate(registros, start=1):
             if not isinstance(registro, dict):
-                raise ValueError("Cada registro deve ser um dicionário.")
+                raise ValueError(f"O registro {indice} de {tipo} deve ser um dicionário.")
 
             id = registro.get("id")
 
             if type(id) is not int or id <= 0:
-                raise ValueError("Cada registro deve possuir um ID inteiro positivo.")
+                raise ValueError(f"O registro {indice} de {tipo} deve possuir um ID inteiro positivo.")
 
             if id in ids:
-                raise ValueError("Existem identificadores duplicados.")
+                raise ValueError(f"Existem identificadores duplicados na coleção {tipo}.")
 
             ids.add(id)
+
+            if any(not isinstance(campo, str) for campo in registro):
+                raise ValueError(f"O registro {indice} de {tipo} possui nomes de campos inválidos.")
+
+            if set(registro) != self.campos[tipo]:
+                ausentes = sorted(self.campos[tipo] - set(registro))
+                extras = sorted(set(registro) - self.campos[tipo])
+                raise ValueError(f"O registro {indice} de {tipo} possui campos incorretos. Ausentes: {ausentes}; extras: {extras}.")
+
+            try:
+                self.modelos[tipo].from_dict(registro)
+            except (ValueError, TypeError, KeyError) as erro:
+                raise ValueError(f"O registro {indice} de {tipo} contém dados inválidos: {erro}") from erro
 
     def listar(self, tipo):
         caminho = self._obter_caminho(tipo)
@@ -57,14 +80,14 @@ class JSONRepository:
         with caminho.open("r", encoding="utf-8") as arquivo:
             registros = json.load(arquivo)
 
-        self._validar_registros(registros)
+        self._validar_registros(registros, tipo)
 
         return registros
 
     def salvar(self, tipo, registros):
         caminho = self._obter_caminho(tipo)
 
-        self._validar_registros(registros)
+        self._validar_registros(registros, tipo)
 
         # Impede sobrescrever silenciosamente um arquivo inválido.
         self.listar(tipo)
@@ -74,7 +97,6 @@ class JSONRepository:
         try:
             with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.diretorio_dados, prefix=f".{tipo}_", suffix=".tmp", delete=False) as arquivo:
                 caminho_temporario = Path(arquivo.name)
-
                 json.dump(registros, arquivo, ensure_ascii=False, indent=4, allow_nan=False)
                 arquivo.flush()
                 os.fsync(arquivo.fileno())

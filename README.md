@@ -156,16 +156,7 @@ Arquivo: `modelos/aluguel.py`
 Construtor:
 
 ```python
-Aluguel(
-    id,
-    filme_id,
-    cliente_id,
-    data_aluguel,
-    data_devolucao_prevista,
-    valor_total,
-    status="ativo",
-    data_devolucao_real=None
-)
+Aluguel(id, filme_id, cliente_id, data_aluguel, data_devolucao_prevista, valor_total, status="ativo", data_devolucao_real=None)
 ```
 
 | Atributo | Tipo | Descrição |
@@ -184,7 +175,7 @@ Os valores permitidos para `status` são:
 - `ativo`: aluguel ainda não devolvido.
 - `devolvido`: aluguel finalizado.
 
-As datas deverão utilizar o formato `AAAA-MM-DD`.
+As datas deverão utilizar o formato `AAAA-MM-DD` e representar datas reais. A data prevista deverá ser posterior à data do aluguel; a data real da devolução não poderá ser anterior à data do aluguel (mas poderá ser anterior ou posterior à data prevista).
 
 Enquanto o aluguel estiver ativo, `data_devolucao_real` deverá ser `None`.
 
@@ -230,7 +221,7 @@ O parâmetro `tipo` aceita somente:
 
 O método `listar()` retorna uma lista de dicionários.
 
-O método `salvar()` recebe uma lista de dicionários e grava os registros no arquivo correspondente.
+O método `salvar()` recebe uma lista de dicionários e grava os registros no arquivo correspondente. Tanto `listar()` quanto `salvar()` deverão exigir todos e somente os campos definidos pelos modelos e validar os valores por meio de `Filme.from_dict()`, `Cliente.from_dict()` ou `Aluguel.from_dict()`. Registros incompletos, com campos extras ou valores inválidos serão rejeitados com `ValueError`.
 
 O método `proximo_id()` retorna um identificador inteiro ainda não utilizado. O identificador deverá ser calculado como:
 
@@ -305,7 +296,7 @@ Os exemplos representam um aluguel ativo de um dos três exemplares do filme.
 - Não utilizar caminhos absolutos específicos de um computador.
 - Não apagar nem sobrescrever silenciosamente um arquivo quando ocorrer erro de leitura.
 - Realizar a escrita primeiro em um arquivo temporário e substituir o arquivo original somente após a gravação bem-sucedida.
-- Tratar erros de leitura, escrita e formatação JSON.
+- Tratar erros de leitura, escrita, formatação JSON e estrutura inválida dos registros.
 - Durante testes automatizados, utilizar diretórios temporários em vez da pasta real `dados`.
 - Antes de operações que alterem mais de um arquivo, o serviço deverá manter os dados anteriores em memória e restaurá-los caso uma das gravações falhe.
 - A aplicação não deverá ser utilizada simultaneamente em duas instâncias modificando os mesmos arquivos JSON.
@@ -354,14 +345,7 @@ obter_filme(filme_id)
 
 buscar_filmes(termo)
 
-cadastrar_filme(
-    titulo,
-    genero,
-    ano,
-    sinopse,
-    preco_diaria,
-    quantidade_total
-)
+cadastrar_filme(titulo, genero, ano, sinopse, preco_diaria, quantidade_total)
 
 cadastrar_cliente(nome, telefone)
 
@@ -730,7 +714,7 @@ Os testes automatizados deverão utilizar dados temporários, sem alterar os arq
 - Salvar e recuperar registros.
 - Calcular corretamente o próximo ID.
 - Preservar caracteres acentuados.
-- Testar comportamento com JSON inválido.
+- Testar comportamento com JSON inválido, registros incompletos, campos extras, datas inválidas e dados que violem os modelos.
 - Verificar que uma falha de escrita não destrói o arquivo anterior.
 
 ### 10.3. Testes do serviço

@@ -94,5 +94,42 @@ class TestAluguel(unittest.TestCase):
         with self.assertRaises(ValueError):
             Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0, status="devolvido")
 
+    def test_datas_invalidas_aluguel(self):
+        casos = ["amanhã", "2026-99-99", "2026-02-30", "2025-02-29", "20260924", "2026-9-24"]
+
+        for data_invalida in casos:
+            with self.subTest(data=data_invalida):
+                with self.assertRaises(ValueError):
+                    Aluguel(1, 1, 1, data_invalida, "2026-09-27", 15.0)
+
+    def test_data_prevista_invalida(self):
+        for data_prevista in ("2026-02-30", "2026-09-24", "2026-09-23"):
+            with self.subTest(data=data_prevista):
+                with self.assertRaises(ValueError):
+                    Aluguel(1, 1, 1, "2026-09-24", data_prevista, 15.0)
+
+    def test_data_real_invalida(self):
+        for data_real in ("2026-02-30", "2026-09-23", "amanhã"):
+            with self.subTest(data=data_real):
+                with self.assertRaises(ValueError):
+                    Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0, status="devolvido", data_devolucao_real=data_real)
+
+    def test_devolucao_antecipada_e_atrasada(self):
+        for data_real in ("2026-09-24", "2026-09-26", "2026-09-29"):
+            with self.subTest(data_real=data_real):
+                aluguel = Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0, status="devolvido", data_devolucao_real=data_real)
+                self.assertEqual(aluguel.data_devolucao_real, data_real)
+
+    def test_data_bissexta_valida(self):
+        aluguel = Aluguel(1, 1, 1, "2024-02-29", "2024-03-01", 5.0)
+        self.assertEqual(aluguel.data_aluguel, "2024-02-29")
+
+    def test_from_dict_rejeita_data_invalida(self):
+        aluguel = Aluguel(1, 1, 1, "2026-09-24", "2026-09-27", 15.0)
+        dados = {**aluguel.to_dict(), "data_aluguel": "2026-99-99"}
+        with self.assertRaises(ValueError):
+            Aluguel.from_dict(dados)
+
+
 if __name__ == "__main__":
     unittest.main()
