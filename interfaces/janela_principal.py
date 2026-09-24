@@ -4,6 +4,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QToolBar
 
 from modelos.filme import Filme
+from interfaces.janela_aluguel import JanelaAluguel
 
 from interfaces.janela_cadastro import JanelaCadastro
 
@@ -52,7 +53,7 @@ class JanelaPrincipal(QMainWindow):
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tabela.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tabela.verticalHeader().setVisible(False)
-        self.tabela.cellDoubleClicked.connect(self.abrir_detalhes_filme)
+        self.tabela.cellDoubleClicked.connect(self.abrir_aluguel)
 
         layout.addWidget(self.tabela)
         self.statusBar().showMessage("Locadora de Filmes")
@@ -97,7 +98,7 @@ class JanelaPrincipal(QMainWindow):
         barra.addAction(self.acao_cadastrar)
 
         self.acao_alugar = QAction("Alugar", self)
-        self.acao_alugar.setEnabled(False)
+        self.acao_alugar.triggered.connect(lambda: self.abrir_aluguel())
         barra.addAction(self.acao_alugar)
 
     def abrir_cadastro(self):
@@ -137,8 +138,40 @@ class JanelaPrincipal(QMainWindow):
 
             for coluna, valor in enumerate(valores):
                 item = QTableWidgetItem(valor)
+                if coluna == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, filme.id)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.tabela.setItem(linha, coluna, item)
+
+    def abrir_aluguel(self, linha=None, coluna=None):
+        if linha is None:
+            linha = self.tabela.currentRow()
+
+        if linha < 0:
+            QMessageBox.warning(self, "Seleção obrigatória", "Selecione um filme para realizar o aluguel.")
+            return
+
+        item = self.tabela.item(linha, 0)
+
+        if item is None:
+            QMessageBox.warning(self, "Erro", "Não foi possível identificar o filme selecionado.")
+            return
+
+        filme_id = item.data(Qt.ItemDataRole.UserRole)
+
+        if filme_id is None:
+            QMessageBox.warning(self, "Erro", "O filme selecionado não possui um identificador válido.")
+            return
+
+        try:
+            janela = JanelaAluguel(self.locadora, filme_id, self)
+
+        except (ValueError, LookupError, OSError) as erro:
+            QMessageBox.warning(self, "Erro ao abrir aluguel", str(erro))
+            return
+
+        janela.aluguel_realizado.connect(self.atualizar_catalogo)
+        janela.exec()
 
     def abrir_detalhes_filme(self, linha, coluna):
         titulo = self.tabela.item(linha, 0).text()
