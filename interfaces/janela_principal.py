@@ -7,6 +7,7 @@ from modelos.filme import Filme
 from interfaces.janela_aluguel import JanelaAluguel
 
 from interfaces.janela_cadastro import JanelaCadastro
+from interfaces.janela_historico import JanelaHistorico
 
 class JanelaPrincipal(QMainWindow):
     def __init__(self, locadora):
@@ -84,6 +85,11 @@ class JanelaPrincipal(QMainWindow):
         acao_cadastrar.triggered.connect(self.abrir_cadastro)
         menu_cadastro.addAction(acao_cadastrar)
 
+        menu_locacoes = self.menuBar().addMenu("Locações")
+        acao_historico = QAction("Histórico e devoluções", self)
+        acao_historico.triggered.connect(self.abrir_historico)
+        menu_locacoes.addAction(acao_historico)
+
     def criar_barra_ferramentas(self):
         barra = QToolBar("Ferramentas")
         barra.setMovable(False)
@@ -100,6 +106,15 @@ class JanelaPrincipal(QMainWindow):
         self.acao_alugar = QAction("Alugar", self)
         self.acao_alugar.triggered.connect(lambda: self.abrir_aluguel())
         barra.addAction(self.acao_alugar)
+
+        self.acao_historico = QAction("Histórico", self)
+        self.acao_historico.triggered.connect(self.abrir_historico)
+        barra.addAction(self.acao_historico)
+
+    def abrir_historico(self):
+        janela = JanelaHistorico(self.locadora, self)
+        janela.devolucao_realizada.connect(self.atualizar_catalogo)
+        janela.exec()
 
     def abrir_cadastro(self):
         janela = JanelaCadastro(self.locadora, self)
