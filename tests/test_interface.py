@@ -1,6 +1,7 @@
 
 import os
 import unittest
+import threading
 
 from unittest.mock import patch
 
@@ -32,7 +33,12 @@ class LocadoraSimulada:
         self.erro_listagem_clientes = None
         self.erro_exclusao_cliente = None
 
+        self.thread_id_listagem = None
+        self.thread_id_clientes = None
+
     def listar_filmes(self):
+        self.thread_id_listagem = threading.get_ident()
+
         if self.erro_listagem is not None:
             raise self.erro_listagem
 
@@ -59,6 +65,8 @@ class LocadoraSimulada:
         return cliente
 
     def listar_clientes(self):
+        self.thread_id_clientes = threading.get_ident()
+
         if self.erro_listagem_clientes is not None:
             raise self.erro_listagem_clientes
 
@@ -97,8 +105,9 @@ class TestInterface(unittest.TestCase):
         self.principal = JanelaPrincipal(self.locadora)
         self.principal.show()
         self.cadastro = None
-        self.app.processEvents()
         self.janela_clientes = None
+
+        self.aguardar_catalogo()
 
     def tearDown(self):
         if self.cadastro is not None:
@@ -109,6 +118,24 @@ class TestInterface(unittest.TestCase):
 
         with patch("interfaces.janela_principal.QMessageBox.question", return_value=16384):
             self.principal.close()
+
+        self.app.processEvents()
+
+    def aguardar_catalogo(self):
+        thread = self.principal.thread_catalogo
+
+        if thread is not None:
+            terminou = thread.wait(2000)
+            self.assertTrue(terminou, "A thread do catálogo não terminou no tempo esperado.")
+
+        self.app.processEvents()
+
+    def aguardar_clientes(self):
+        thread = self.janela_clientes.thread_clientes
+
+        if thread is not None:
+            terminou = thread.wait(2000)
+            self.assertTrue(terminou, "A thread de clientes não terminou no tempo esperado.")
 
         self.app.processEvents()
 
@@ -148,6 +175,7 @@ class TestInterface(unittest.TestCase):
         self.locadora.cadastrar_filme("Matrix", "Ficção científica", 1999, "Um mundo simulado.", 7.50, 4)
 
         self.principal.atualizar_catalogo()
+        self.aguardar_catalogo()
 
         self.assertEqual(self.principal.tabela.rowCount(), 3)
 
@@ -247,6 +275,8 @@ class TestInterface(unittest.TestCase):
         with patch("interfaces.janela_cadastro.QMessageBox.information"):
             self.clicar_botao("Cadastrar filme")
 
+        self.aguardar_catalogo()
+
         self.assertEqual(self.principal.tabela.rowCount(), 3)
         self.assertEqual(self.principal.tabela.item(2, 0).text(), "Matrix")
 
@@ -255,8 +285,10 @@ class TestInterface(unittest.TestCase):
 
         with patch("interfaces.janela_principal.QMessageBox.warning") as aviso:
             self.principal.atualizar_catalogo()
+            self.aguardar_catalogo()
 
-        aviso.assert_called_once()
+            aviso.assert_called_once()
+
         self.assertEqual(self.principal.tabela.rowCount(), 0)
 
     def test_13_excluir_filme_remove_do_catalogo(self):
@@ -265,6 +297,8 @@ class TestInterface(unittest.TestCase):
         with patch("interfaces.janela_principal.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
             with patch("interfaces.janela_principal.QMessageBox.information") as mensagem:
                 self.principal.excluir_filme()
+
+        self.aguardar_catalogo()
 
         self.assertEqual(len(self.locadora.filmes), 1)
         self.assertEqual(self.locadora.filmes[0].titulo, "A Origem")
@@ -284,6 +318,8 @@ class TestInterface(unittest.TestCase):
         self.locadora.cadastrar_cliente("Maria Silva", "011999999999")
         self.janela_clientes = JanelaClientes(self.locadora, self.principal)
 
+        self.aguardar_clientes()
+
         self.assertEqual(self.janela_clientes.tabela.rowCount(), 1)
         self.assertEqual(self.janela_clientes.tabela.item(0, 1).text(), "Maria Silva")
         self.assertEqual(self.janela_clientes.tabela.item(0, 2).text(), "011999999999")
@@ -291,11 +327,15 @@ class TestInterface(unittest.TestCase):
     def test_16_excluir_cliente_remove_da_tabela(self):
         self.locadora.cadastrar_cliente("Maria Silva", "011999999999")
         self.janela_clientes = JanelaClientes(self.locadora, self.principal)
+
+        self.aguardar_clientes()
         self.janela_clientes.tabela.selectRow(0)
 
         with patch("interfaces.janela_clientes.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
             with patch("interfaces.janela_clientes.QMessageBox.information") as mensagem:
                 self.janela_clientes.excluir_cliente()
+
+        self.aguardar_clientes()
 
         self.assertEqual(self.locadora.clientes, [])
         self.assertEqual(self.janela_clientes.tabela.rowCount(), 0)
@@ -305,6 +345,8 @@ class TestInterface(unittest.TestCase):
         self.locadora.cadastrar_cliente("Maria Silva", "011999999999")
         self.locadora.erro_exclusao_cliente = ValueError("Cliente possui aluguel registrado.")
         self.janela_clientes = JanelaClientes(self.locadora, self.principal)
+
+        self.aguardar_clientes()
         self.janela_clientes.tabela.selectRow(0)
 
         with patch("interfaces.janela_clientes.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
@@ -316,10 +358,37 @@ class TestInterface(unittest.TestCase):
         aviso.assert_called_once()
 
     def test_18_acao_clientes_abre_janela(self):
-        with patch.object(JanelaClientes, "exec", return_value=0) as executar:
+        with patch("interfaces.janela_principal.JanelaClientes") as classe_janela:
+            janela = classe_janela.return_value
+
             self.principal.acao_clientes.trigger()
 
-        executar.assert_called_once()
+            classe_janela.assert_called_once_with(self.locadora, self.principal)
+            janela.exec.assert_called_once()
+
+    def test_19_catalogo_e_carregado_em_thread_secundaria(self):
+        self.assertIsNotNone(self.locadora.thread_id_listagem)
+        self.assertNotEqual(self.locadora.thread_id_listagem, threading.get_ident())
+
+    def test_20_falha_na_listagem_clientes_exibe_aviso(self):
+        self.locadora.erro_listagem_clientes = OSError("Falha na leitura dos clientes.")
+
+        with patch("interfaces.janela_clientes.QMessageBox.warning") as aviso:
+            self.janela_clientes = JanelaClientes(self.locadora, self.principal)
+            self.aguardar_clientes()
+
+            aviso.assert_called_once()
+
+        self.assertEqual(self.janela_clientes.tabela.rowCount(), 0)
+
+    def test_21_clientes_sao_carregados_em_thread_secundaria(self):
+        self.locadora.cadastrar_cliente("Maria Silva", "011999999999")
+        self.janela_clientes = JanelaClientes(self.locadora, self.principal)
+
+        self.aguardar_clientes()
+
+        self.assertIsNotNone(self.locadora.thread_id_clientes)
+        self.assertNotEqual(self.locadora.thread_id_clientes, threading.get_ident())
 
 if __name__ == "__main__":
     unittest.main()

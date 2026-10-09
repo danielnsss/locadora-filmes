@@ -3,6 +3,7 @@ from datetime import date
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QAbstractItemView, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
+from interfaces.workers import CarregamentoThread
 
 class JanelaHistorico(QDialog):
     devolucao_realizada = Signal()
@@ -11,6 +12,7 @@ class JanelaHistorico(QDialog):
         super().__init__(parent)
 
         self.locadora = locadora
+        self.thread_historico = None
         self.setWindowTitle("Histórico de Locações")
         self.resize(1050, 540)
         self.criar_interface()
@@ -75,20 +77,32 @@ class JanelaHistorico(QDialog):
         return date.fromisoformat(valor).strftime("%d/%m/%Y")
 
     def atualizar_tabela(self):
-        try:
-            status = self.filtro.currentData()
-            alugueis = self.locadora.listar_alugueis(status)
-            filmes = {filme.id: filme.titulo for filme in self.locadora.listar_filmes()}
-            clientes = {cliente.id: cliente.nome for cliente in self.locadora.listar_clientes()}
-
-        except (OSError, ValueError, LookupError, RuntimeError) as erro:
-            self.tabela.setRowCount(0)
-            self.label_resultado.setText("Não foi possível carregar o histórico.")
-            self.botao_devolver.setEnabled(False)
-            QMessageBox.warning(self, "Erro ao carregar histórico", str(erro))
+        if self.thread_historico is not None and self.thread_historico.isRunning():
             return
 
-        self.tabela.setRowCount(0)
+        status = self.filtro.currentData()
+        thread = CarregamentoThread(lambda: self.carregar_historico(status), self)
+        self.thread_historico = thread
+
+        thread.concluido.connect(self.historico_carregado)
+        thread.erro.connect(self.erro_carregamento_historico)
+        thread.finished.connect(lambda: self.finalizar_thread_historico(thread))
+        thread.finished.connect(thread.deleteLater)
+
+        self.label_resultado.setText("Carregando histórico...")
+        self.botao_devolver.setEnabled(False)
+        thread.start()
+
+    def carregar_historico(self, status):
+        alugueis = self.locadora.listar_alugueis(status)
+        filmes = {filme.id: filme.titulo for filme in self.locadora.listar_filmes()}
+        clientes = {cliente.id: cliente.nome for cliente in self.locadora.listar_clientes()}
+
+        return alugueis, filmes, clientes
+
+    def historico_carregado(self, dados):
+        alugueis, filmes, clientes = dados
+
         self.tabela.setRowCount(len(alugueis))
 
         for linha, aluguel in enumerate(alugueis):
@@ -118,6 +132,16 @@ class JanelaHistorico(QDialog):
         self.tabela.clearSelection()
         self.botao_devolver.setEnabled(False)
         self.label_resultado.setText(f"{len(alugueis)} aluguel(is) encontrado(s).")
+
+    def erro_carregamento_historico(self, mensagem):
+        self.tabela.setRowCount(0)
+        self.label_resultado.setText("Não foi possível carregar o histórico.")
+        self.botao_devolver.setEnabled(False)
+        QMessageBox.warning(self, "Erro ao carregar histórico", mensagem)
+
+    def finalizar_thread_historico(self, thread):
+        if self.thread_historico is thread:
+            self.thread_historico = None
 
     def atualizar_botao_devolver(self):
         linhas = self.tabela.selectionModel().selectedRows()
@@ -151,3 +175,13 @@ class JanelaHistorico(QDialog):
         self.devolucao_realizada.emit()
         self.atualizar_tabela()
         QMessageBox.information(self, "Devolução realizada", "Filme devolvido com sucesso.")
+
+    def closeEvent(self, evento):
+        if self.thread_historico is not None and self.thread_historico.isRunning():
+            terminou = self.thread_historico.wait(2000)
+
+            if not terminou:
+                evento.ignore()
+                return
+
+        evento.accept()

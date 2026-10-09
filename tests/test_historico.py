@@ -1,5 +1,6 @@
 import os
 import unittest
+import threading
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -23,6 +24,7 @@ class LocadoraSimulada:
         self.devolvidos = []
         self.erro_listagem = None
         self.erro_devolucao = None
+        self.thread_id_historico = None
 
     def listar_filmes(self):
         return self.filmes
@@ -31,6 +33,8 @@ class LocadoraSimulada:
         return self.clientes
 
     def listar_alugueis(self, status=None):
+        self.thread_id_historico = threading.get_ident()
+
         if self.erro_listagem:
             raise self.erro_listagem
 
@@ -59,6 +63,16 @@ class TestJanelaHistorico(unittest.TestCase):
     def setUp(self):
         self.locadora = LocadoraSimulada()
         self.janela = JanelaHistorico(self.locadora)
+        self.aguardar_historico()
+
+    def aguardar_historico(self):
+        thread = self.janela.thread_historico
+
+        if thread is not None:
+            terminou = thread.wait(2000)
+            self.assertTrue(terminou, "A thread do histórico não terminou no tempo esperado.")
+
+        self.app.processEvents()
 
     def tearDown(self):
         self.janela.close()
@@ -71,10 +85,14 @@ class TestJanelaHistorico(unittest.TestCase):
 
     def test_02_filtra_ativos_e_devolvidos(self):
         self.janela.filtro.setCurrentIndex(1)
+        self.aguardar_historico()
+
         self.assertEqual(self.janela.tabela.rowCount(), 1)
         self.assertEqual(self.janela.tabela.item(0, 7).text(), "Ativo")
 
         self.janela.filtro.setCurrentIndex(2)
+        self.aguardar_historico()
+
         self.assertEqual(self.janela.tabela.rowCount(), 1)
         self.assertEqual(self.janela.tabela.item(0, 7).text(), "Devolvido")
 
@@ -103,6 +121,8 @@ class TestJanelaHistorico(unittest.TestCase):
             with patch("interfaces.janela_historico.QMessageBox.information"):
                 self.janela.confirmar_devolucao()
 
+        self.aguardar_historico()
+
         self.assertEqual(self.locadora.devolvidos, [1])
         self.assertEqual(sinais, [True])
         self.assertEqual(self.janela.tabela.item(0, 7).text(), "Devolvido")
@@ -127,10 +147,16 @@ class TestJanelaHistorico(unittest.TestCase):
 
         with patch("interfaces.janela_historico.QMessageBox.warning") as aviso:
             self.janela.atualizar_tabela()
+            self.aguardar_historico()
 
-        aviso.assert_called_once()
+            aviso.assert_called_once()
+
         self.assertEqual(self.janela.tabela.rowCount(), 0)
         self.assertFalse(self.janela.botao_devolver.isEnabled())
+
+    def test_08_historico_e_carregado_em_thread_secundaria(self):
+        self.assertIsNotNone(self.locadora.thread_id_historico)
+        self.assertNotEqual(self.locadora.thread_id_historico, threading.get_ident())
 
 
 if __name__ == "__main__":

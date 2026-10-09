@@ -1,16 +1,7 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
-    QMessageBox
-)
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox
+
+from interfaces.workers import CarregamentoThread
 
 
 class JanelaClientes(QDialog):
@@ -19,6 +10,7 @@ class JanelaClientes(QDialog):
 
         self.locadora = locadora
         self.clientes = []
+        self.thread_clientes = None
 
         self.setWindowTitle("Clientes - Locadora de Filmes")
         self.resize(650, 450)
@@ -63,13 +55,39 @@ class JanelaClientes(QDialog):
         layout.addLayout(botoes)
 
     def atualizar_clientes(self):
-        try:
-            self.clientes = self.locadora.listar_clientes()
+        if self.thread_clientes is not None and self.thread_clientes.isRunning():
+            return
 
-        except (OSError, ValueError) as erro:
-            self.clientes = []
-            QMessageBox.warning(self, "Erro", str(erro))
+        thread = CarregamentoThread(self.locadora.listar_clientes, self)
+        self.thread_clientes = thread
 
+        thread.concluido.connect(self.clientes_carregados)
+        thread.nao_implementado.connect(self.clientes_indisponiveis)
+        thread.erro.connect(self.erro_carregamento_clientes)
+        thread.finished.connect(lambda: self.finalizar_thread_clientes(thread))
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+    def clientes_carregados(self, clientes):
+        self.clientes = clientes
+        self.preencher_tabela()
+
+    def clientes_indisponiveis(self):
+        self.clientes = []
+        self.preencher_tabela()
+        QMessageBox.warning(self, "Serviço indisponível", "A consulta de clientes ainda não está disponível.")
+
+    def erro_carregamento_clientes(self, mensagem):
+        self.clientes = []
+        self.preencher_tabela()
+        QMessageBox.warning(self, "Erro", mensagem)
+
+    def finalizar_thread_clientes(self, thread):
+        if self.thread_clientes is thread:
+            self.thread_clientes = None
+
+    def preencher_tabela(self):
         self.tabela.setRowCount(len(self.clientes))
 
         for linha, cliente in enumerate(self.clientes):
@@ -103,13 +121,7 @@ class JanelaClientes(QDialog):
             QMessageBox.warning(self, "Erro", "O cliente selecionado não possui um identificador válido.")
             return
 
-        resposta = QMessageBox.question(
-            self,
-            "Excluir cliente",
-            f'Deseja realmente excluir o cliente "{item_nome.text()}"?',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
+        resposta = QMessageBox.question(self, "Excluir cliente", f'Deseja realmente excluir o cliente "{item_nome.text()}"?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
         if resposta != QMessageBox.StandardButton.Yes:
             return
@@ -123,3 +135,13 @@ class JanelaClientes(QDialog):
 
         self.atualizar_clientes()
         QMessageBox.information(self, "Cliente excluído", "Cliente excluído com sucesso.")
+
+    def closeEvent(self, evento):
+        if self.thread_clientes is not None and self.thread_clientes.isRunning():
+            terminou = self.thread_clientes.wait(2000)
+
+            if not terminou:
+                evento.ignore()
+                return
+
+        evento.accept()

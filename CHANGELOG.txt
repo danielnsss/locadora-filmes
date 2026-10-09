@@ -1,5 +1,7 @@
-CHANGELOG - ENTREGA PARCIAL 1
-Trabalho 02 - Programação Orientada a Objetos II
+CHANGELOG - TRABALHO 02
+Programação Orientada a Objetos II
+
+ENTREGA PARCIAL 1
 Data: 09/10/2026
 
 Alterações realizadas:
@@ -17,15 +19,34 @@ Alterações realizadas:
 - Adicionados testes automatizados para as novas funcionalidades.
 - Realizada a execução da suíte completa de testes, sem falhas.
 
+
+ENTREGA PARCIAL 2
+Data: 16/10/2026
+
+Alterações realizadas:
+
+- Criada infraestrutura reutilizável para execução de tarefas em threads utilizando QThread.
+- Implementado carregamento do catálogo de filmes em thread secundária.
+- Implementado carregamento da lista de clientes em thread secundária.
+- Implementado carregamento do histórico de aluguéis em thread secundária.
+- Utilizados signals para enviar os resultados das threads para a interface gráfica.
+- Mantida a atualização dos widgets exclusivamente na thread principal.
+- Adicionado tratamento de erros durante o carregamento assíncrono dos dados.
+- Adicionado controle para evitar múltiplas threads de carregamento simultâneas na mesma janela.
+- Adicionado tratamento no fechamento das janelas durante a execução das threads.
+- Adaptados os testes de interface para operações assíncronas.
+- Adicionados testes para verificar que os carregamentos são executados em threads diferentes da thread principal.
+- Realizada a execução da suíte completa com 86 testes, sem falhas.
+
+
 Arquivos principais modificados:
 
-- armazenamento/json_repository.py
-- servicos/locadora.py
 - interfaces/janela_principal.py
-- tests/test_json_repository.py
-- tests/test_locadora.py
+- interfaces/janela_clientes.py
+- interfaces/janela_historico.py
 - tests/test_interface.py
+- tests/test_historico.py
 
 Arquivo criado:
 
-- interfaces/janela_clientes.py
+- interfaces/workers.py

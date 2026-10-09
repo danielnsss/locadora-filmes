@@ -9,6 +9,7 @@ from interfaces.janela_aluguel import JanelaAluguel
 from interfaces.janela_cadastro import JanelaCadastro
 from interfaces.janela_historico import JanelaHistorico
 from interfaces.janela_clientes import JanelaClientes
+from interfaces.workers import CarregamentoThread
 
 class JanelaPrincipal(QMainWindow):
     def __init__(self, locadora):
@@ -16,6 +17,7 @@ class JanelaPrincipal(QMainWindow):
 
         self.locadora = locadora
         self.filmes = []
+        self.thread_catalogo = None
 
         self.setWindowTitle("Locadora de Filmes")
         self.resize(1000, 650)
@@ -146,24 +148,51 @@ class JanelaPrincipal(QMainWindow):
         janela.exec()
 
     def atualizar_catalogo(self):
-        try:
-            self.filmes = self.locadora.listar_filmes()
-            mensagem = f"{len(self.filmes)} filme(s) encontrado(s)."
+        if self.thread_catalogo is not None and self.thread_catalogo.isRunning():
+            self.statusBar().showMessage("Atualização do catálogo em andamento.")
+            return
 
-        except NotImplementedError:
-            self.filmes = [
-                Filme(1, "Interestelar", "Ficção científica", 2014, "Uma viagem pelo espaço.", 5.0, 3),
-                Filme(2, "A Origem", "Ficção científica", 2010, "Um filme sobre sonhos.", 6.0, 2)
-            ]
-            mensagem = "Modo de demonstração: serviço ainda não implementado."
+        thread = CarregamentoThread(self.locadora.listar_filmes, self)
+        self.thread_catalogo = thread
 
-        except (OSError, ValueError) as erro:
-            self.filmes = []
-            mensagem = "Não foi possível carregar o catálogo."
-            QMessageBox.warning(self, "Erro", str(erro))
+        thread.concluido.connect(self.catalogo_carregado)
+        thread.nao_implementado.connect(self.catalogo_demonstracao)
+        thread.erro.connect(self.erro_carregamento_catalogo)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: self.finalizar_thread_catalogo(thread))
+
+        self.statusBar().showMessage("Carregando catálogo...")
+        thread.start()
+
+    def catalogo_carregado(self, filmes):
+        self.filmes = filmes
+        self.pesquisar_filmes(self.campo_pesquisa.text())
+
+        mensagem = f"{len(self.filmes)} filme(s) encontrado(s)."
+        self.statusBar().showMessage(mensagem)
+
+
+    def catalogo_demonstracao(self):
+        self.filmes = [
+            Filme(1, "Interestelar", "Ficção científica", 2014, "Uma viagem pelo espaço.", 5.0, 3),
+            Filme(2, "A Origem", "Ficção científica", 2010, "Um filme sobre sonhos.", 6.0, 2)
+        ]
 
         self.pesquisar_filmes(self.campo_pesquisa.text())
-        self.statusBar().showMessage(mensagem)
+        self.statusBar().showMessage("Modo de demonstração: serviço ainda não implementado.")
+
+
+    def erro_carregamento_catalogo(self, mensagem):
+        self.filmes = []
+        self.pesquisar_filmes(self.campo_pesquisa.text())
+
+        self.statusBar().showMessage("Não foi possível carregar o catálogo.")
+        QMessageBox.warning(self, "Erro", mensagem)
+
+
+    def finalizar_thread_catalogo(self, thread):
+        if self.thread_catalogo is thread:
+            self.thread_catalogo = None
 
     def pesquisar_filmes(self, termo):
         termo = termo.strip().casefold()
@@ -230,13 +259,7 @@ class JanelaPrincipal(QMainWindow):
             QMessageBox.warning(self, "Erro", "O filme selecionado não possui um identificador válido.")
             return
 
-        resposta = QMessageBox.question(
-            self,
-            "Excluir filme",
-            f'Deseja realmente excluir o filme "{item.text()}"?',
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
+        resposta = QMessageBox.question(self, "Excluir filme", f'Deseja realmente excluir o filme "{item.text()}"?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
         if resposta != QMessageBox.StandardButton.Yes:
             return
@@ -262,6 +285,9 @@ class JanelaPrincipal(QMainWindow):
         resposta = QMessageBox.question(self, "Sair", "Deseja realmente fechar a aplicação?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
         if resposta == QMessageBox.StandardButton.Yes:
+            if self.thread_catalogo is not None and self.thread_catalogo.isRunning():
+                self.thread_catalogo.wait(2000)
+
             evento.accept()
         else:
             evento.ignore()
