@@ -8,6 +8,7 @@ from interfaces.janela_aluguel import JanelaAluguel
 
 from interfaces.janela_cadastro import JanelaCadastro
 from interfaces.janela_historico import JanelaHistorico
+from interfaces.janela_clientes import JanelaClientes
 
 class JanelaPrincipal(QMainWindow):
     def __init__(self, locadora):
@@ -73,6 +74,16 @@ class JanelaPrincipal(QMainWindow):
         acao_atualizar.triggered.connect(self.atualizar_catalogo)
         menu_filmes.addAction(acao_atualizar)
 
+        acao_excluir = QAction("Excluir filme", self)
+        acao_excluir.triggered.connect(self.excluir_filme)
+        menu_filmes.addAction(acao_excluir)
+
+        menu_clientes = self.menuBar().addMenu("Clientes")
+
+        acao_clientes = QAction("Consultar clientes", self)
+        acao_clientes.triggered.connect(self.abrir_clientes)
+        menu_clientes.addAction(acao_clientes)
+
         menu_ajuda = self.menuBar().addMenu("Ajuda")
 
         acao_sobre = QAction("Sobre", self)
@@ -103,9 +114,17 @@ class JanelaPrincipal(QMainWindow):
         self.acao_cadastrar.triggered.connect(self.abrir_cadastro)
         barra.addAction(self.acao_cadastrar)
 
+        self.acao_clientes = QAction("Clientes", self)
+        self.acao_clientes.triggered.connect(self.abrir_clientes)
+        barra.addAction(self.acao_clientes)
+
         self.acao_alugar = QAction("Alugar", self)
         self.acao_alugar.triggered.connect(lambda: self.abrir_aluguel())
         barra.addAction(self.acao_alugar)
+
+        self.acao_excluir = QAction("Excluir filme", self)
+        self.acao_excluir.triggered.connect(self.excluir_filme)
+        barra.addAction(self.acao_excluir)
 
         self.acao_historico = QAction("Histórico", self)
         self.acao_historico.triggered.connect(self.abrir_historico)
@@ -120,6 +139,10 @@ class JanelaPrincipal(QMainWindow):
         janela = JanelaCadastro(self.locadora, self)
         janela.filme_cadastrado.connect(self.atualizar_catalogo)
         janela.cliente_cadastrado.connect(lambda: self.statusBar().showMessage("Cliente cadastrado com sucesso.", 5000))
+        janela.exec()
+
+    def abrir_clientes(self):
+        janela = JanelaClientes(self.locadora, self)
         janela.exec()
 
     def atualizar_catalogo(self):
@@ -187,6 +210,46 @@ class JanelaPrincipal(QMainWindow):
 
         janela.aluguel_realizado.connect(self.atualizar_catalogo)
         janela.exec()
+
+    def excluir_filme(self):
+        linha = self.tabela.currentRow()
+
+        if linha < 0:
+            QMessageBox.warning(self, "Seleção obrigatória", "Selecione um filme para excluir.")
+            return
+
+        item = self.tabela.item(linha, 0)
+
+        if item is None:
+            QMessageBox.warning(self, "Erro", "Não foi possível identificar o filme selecionado.")
+            return
+
+        filme_id = item.data(Qt.ItemDataRole.UserRole)
+
+        if filme_id is None:
+            QMessageBox.warning(self, "Erro", "O filme selecionado não possui um identificador válido.")
+            return
+
+        resposta = QMessageBox.question(
+            self,
+            "Excluir filme",
+            f'Deseja realmente excluir o filme "{item.text()}"?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if resposta != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            self.locadora.excluir_filme(filme_id)
+
+        except (ValueError, LookupError, OSError) as erro:
+            QMessageBox.warning(self, "Erro ao excluir filme", str(erro))
+            return
+
+        self.atualizar_catalogo()
+        QMessageBox.information(self, "Filme excluído", "Filme excluído com sucesso.")
 
     def abrir_detalhes_filme(self, linha, coluna):
         titulo = self.tabela.item(linha, 0).text()

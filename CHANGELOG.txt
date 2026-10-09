@@ -1,0 +1,31 @@
+CHANGELOG - ENTREGA PARCIAL 1
+Trabalho 02 - Programação Orientada a Objetos II
+Data: 09/10/2026
+
+Alterações realizadas:
+
+- Implementada a exclusão de registros no repositório JSON.
+- Implementada a exclusão de filmes.
+- Implementada a consulta de clientes por identificador.
+- Implementada a exclusão de clientes.
+- Adicionadas validações para impedir a exclusão de filmes e clientes que possuem aluguéis registrados.
+- Adicionada a opção de exclusão de filmes na interface principal.
+- Criada uma nova janela para consulta dos clientes cadastrados.
+- Adicionada a opção de exclusão de clientes na nova janela de clientes.
+- Adicionadas mensagens de confirmação e de erro durante as operações de exclusão.
+- Atualização automática das tabelas após a exclusão de registros.
+- Adicionados testes automatizados para as novas funcionalidades.
+- Realizada a execução da suíte completa de testes, sem falhas.
+
+Arquivos principais modificados:
+
+- armazenamento/json_repository.py
+- servicos/locadora.py
+- interfaces/janela_principal.py
+- tests/test_json_repository.py
+- tests/test_locadora.py
+- tests/test_interface.py
+
+Arquivo criado:
+
+- interfaces/janela_clientes.py

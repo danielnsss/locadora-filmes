@@ -166,6 +166,29 @@ class TestJSONRepository(unittest.TestCase):
         self.assertEqual(self.repositorio.listar("filmes"), originais)
         self.assertEqual(list(Path(self.pasta_temporaria.name).glob("*.tmp")), [])
 
+    def test_excluir_remove_registro(self):
+        registros = [self._filme(1), self._filme(2, "Avatar")]
+        self.repositorio.salvar("filmes", registros)
 
+        self.repositorio.excluir("filmes", 1)
+
+        self.assertEqual(self.repositorio.listar("filmes"), [registros[1]])
+
+    def test_excluir_registro_inexistente(self):
+        self.repositorio.salvar("filmes", [self._filme(1)])
+
+        with self.assertRaises(LookupError):
+            self.repositorio.excluir("filmes", 999)
+
+        self.assertEqual(self.repositorio.listar("filmes"), [self._filme(1)])
+
+    def test_excluir_rejeita_id_invalido(self):
+        for registro_id in (0, -1, True, 1.5, "1"):
+            with self.subTest(registro_id=registro_id):
+                with self.assertRaises(ValueError):
+                    self.repositorio.excluir("filmes", registro_id)
+
+        with self.assertRaises(ValueError):
+            self.repositorio.excluir("usuarios", 1)
 if __name__ == "__main__":
     unittest.main()

@@ -163,6 +163,60 @@ class TestLocadora(unittest.TestCase):
         self.assertEqual(self.repositorio.listar("filmes"), filmes_antes)
         self.assertEqual(self.repositorio.listar("alugueis"), alugueis_antes)
 
+    def test_15_obter_cliente(self):
+        cliente = self.locadora.obter_cliente(self.cliente.id)
+
+        self.assertEqual(cliente.id, self.cliente.id)
+        self.assertEqual(cliente.nome, self.cliente.nome)
+
+        with self.assertRaises(LookupError):
+            self.locadora.obter_cliente(9999)
+
+        for cliente_id in (0, -1, True, 1.5, "1"):
+            with self.subTest(cliente_id=cliente_id):
+                with self.assertRaises(ValueError):
+                    self.locadora.obter_cliente(cliente_id)
+
+    def test_16_excluir_filme_sem_aluguel(self):
+        excluido = self.locadora.excluir_filme(self.filme.id)
+
+        self.assertEqual(excluido.id, self.filme.id)
+        self.assertEqual(self.locadora.listar_filmes(), [])
+
+    def test_17_excluir_cliente_sem_aluguel(self):
+        excluido = self.locadora.excluir_cliente(self.cliente.id)
+
+        self.assertEqual(excluido.id, self.cliente.id)
+        self.assertEqual(self.locadora.listar_clientes(), [])
+
+    def test_18_nao_excluir_filme_com_aluguel(self):
+        self.locadora.alugar_filme(self.filme.id, self.cliente.id, 2)
+
+        with self.assertRaises(ValueError):
+            self.locadora.excluir_filme(self.filme.id)
+
+        self.assertEqual(len(self.locadora.listar_filmes()), 1)
+
+    def test_19_nao_excluir_cliente_com_aluguel(self):
+        self.locadora.alugar_filme(self.filme.id, self.cliente.id, 2)
+
+        with self.assertRaises(ValueError):
+            self.locadora.excluir_cliente(self.cliente.id)
+
+        self.assertEqual(len(self.locadora.listar_clientes()), 1)
+
+    def test_20_historico_impede_exclusao_apos_devolucao(self):
+        aluguel = self.locadora.alugar_filme(self.filme.id, self.cliente.id, 2)
+        self.locadora.devolver_filme(aluguel.id)
+
+        with self.assertRaises(ValueError):
+            self.locadora.excluir_filme(self.filme.id)
+
+        with self.assertRaises(ValueError):
+            self.locadora.excluir_cliente(self.cliente.id)
+
+        self.assertEqual(len(self.locadora.listar_filmes()), 1)
+        self.assertEqual(len(self.locadora.listar_clientes()), 1)
 
 if __name__ == "__main__":
     unittest.main()

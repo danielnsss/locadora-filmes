@@ -58,6 +58,37 @@ class Locadora:
         registros = self.repositorio.listar("clientes")
         return [Cliente.from_dict(registro) for registro in registros]
 
+    def obter_cliente(self, cliente_id):
+        if type(cliente_id) is not int or cliente_id <= 0:
+            raise ValueError("O ID do cliente deve ser um inteiro positivo.")
+
+        for cliente in self.listar_clientes():
+            if cliente.id == cliente_id:
+                return cliente
+
+        raise LookupError("Cliente não encontrado.")
+
+    def excluir_filme(self, filme_id):
+        filme = self.obter_filme(filme_id)
+        alugueis = self.repositorio.listar("alugueis")
+
+        if any(registro["filme_id"] == filme_id for registro in alugueis):
+            raise ValueError("Não é possível excluir um filme que possui aluguel registrado.")
+
+        self.repositorio.excluir("filmes", filme_id)
+
+        return filme
+
+    def excluir_cliente(self, cliente_id):
+        cliente = self.obter_cliente(cliente_id)
+        alugueis = self.repositorio.listar("alugueis")
+
+        if any(registro["cliente_id"] == cliente_id for registro in alugueis):
+            raise ValueError("Não é possível excluir um cliente que possui aluguel registrado.")
+
+        self.repositorio.excluir("clientes", cliente_id)
+
+        return cliente
     
     def alugar_filme(self, filme_id, cliente_id, dias):
         if type(dias) is not int or dias <= 0:

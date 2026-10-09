@@ -6,12 +6,13 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QPushButton, QMessageBox
 
 from modelos.filme import Filme
 from modelos.cliente import Cliente
 from interfaces.janela_principal import JanelaPrincipal
 from interfaces.janela_cadastro import JanelaCadastro
+from interfaces.janela_clientes import JanelaClientes
 
 
 class LocadoraSimulada:
@@ -26,6 +27,10 @@ class LocadoraSimulada:
         self.erro_filme = None
         self.erro_cliente = None
         self.erro_listagem = None
+
+        self.erro_exclusao_filme = None
+        self.erro_listagem_clientes = None
+        self.erro_exclusao_cliente = None
 
     def listar_filmes(self):
         if self.erro_listagem is not None:
@@ -53,6 +58,34 @@ class LocadoraSimulada:
 
         return cliente
 
+    def listar_clientes(self):
+        if self.erro_listagem_clientes is not None:
+            raise self.erro_listagem_clientes
+
+        return list(self.clientes)
+
+    def excluir_filme(self, filme_id):
+        if self.erro_exclusao_filme is not None:
+            raise self.erro_exclusao_filme
+
+        for filme in self.filmes:
+            if filme.id == filme_id:
+                self.filmes.remove(filme)
+                return filme
+
+        raise LookupError("Filme não encontrado.")
+
+    def excluir_cliente(self, cliente_id):
+        if self.erro_exclusao_cliente is not None:
+            raise self.erro_exclusao_cliente
+
+        for cliente in self.clientes:
+            if cliente.id == cliente_id:
+                self.clientes.remove(cliente)
+                return cliente
+
+        raise LookupError("Cliente não encontrado.")
+
 
 class TestInterface(unittest.TestCase):
     @classmethod
@@ -65,10 +98,14 @@ class TestInterface(unittest.TestCase):
         self.principal.show()
         self.cadastro = None
         self.app.processEvents()
+        self.janela_clientes = None
 
     def tearDown(self):
         if self.cadastro is not None:
             self.cadastro.close()
+
+        if self.janela_clientes is not None:
+            self.janela_clientes.close()
 
         with patch("interfaces.janela_principal.QMessageBox.question", return_value=16384):
             self.principal.close()
@@ -222,6 +259,67 @@ class TestInterface(unittest.TestCase):
         aviso.assert_called_once()
         self.assertEqual(self.principal.tabela.rowCount(), 0)
 
+    def test_13_excluir_filme_remove_do_catalogo(self):
+        self.principal.tabela.selectRow(0)
+
+        with patch("interfaces.janela_principal.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+            with patch("interfaces.janela_principal.QMessageBox.information") as mensagem:
+                self.principal.excluir_filme()
+
+        self.assertEqual(len(self.locadora.filmes), 1)
+        self.assertEqual(self.locadora.filmes[0].titulo, "A Origem")
+        self.assertEqual(self.principal.tabela.rowCount(), 1)
+        mensagem.assert_called_once()
+
+    def test_14_cancelar_exclusao_preserva_filme(self):
+        self.principal.tabela.selectRow(0)
+
+        with patch("interfaces.janela_principal.QMessageBox.question", return_value=QMessageBox.StandardButton.No):
+            self.principal.excluir_filme()
+
+        self.assertEqual(len(self.locadora.filmes), 2)
+        self.assertEqual(self.principal.tabela.rowCount(), 2)
+
+    def test_15_janela_clientes_carrega_clientes(self):
+        self.locadora.cadastrar_cliente("Maria Silva", "011999999999")
+        self.janela_clientes = JanelaClientes(self.locadora, self.principal)
+
+        self.assertEqual(self.janela_clientes.tabela.rowCount(), 1)
+        self.assertEqual(self.janela_clientes.tabela.item(0, 1).text(), "Maria Silva")
+        self.assertEqual(self.janela_clientes.tabela.item(0, 2).text(), "011999999999")
+
+    def test_16_excluir_cliente_remove_da_tabela(self):
+        self.locadora.cadastrar_cliente("Maria Silva", "011999999999")
+        self.janela_clientes = JanelaClientes(self.locadora, self.principal)
+        self.janela_clientes.tabela.selectRow(0)
+
+        with patch("interfaces.janela_clientes.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+            with patch("interfaces.janela_clientes.QMessageBox.information") as mensagem:
+                self.janela_clientes.excluir_cliente()
+
+        self.assertEqual(self.locadora.clientes, [])
+        self.assertEqual(self.janela_clientes.tabela.rowCount(), 0)
+        mensagem.assert_called_once()
+
+    def test_17_erro_na_exclusao_cliente_preserva_registro(self):
+        self.locadora.cadastrar_cliente("Maria Silva", "011999999999")
+        self.locadora.erro_exclusao_cliente = ValueError("Cliente possui aluguel registrado.")
+        self.janela_clientes = JanelaClientes(self.locadora, self.principal)
+        self.janela_clientes.tabela.selectRow(0)
+
+        with patch("interfaces.janela_clientes.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+            with patch("interfaces.janela_clientes.QMessageBox.warning") as aviso:
+                self.janela_clientes.excluir_cliente()
+
+        self.assertEqual(len(self.locadora.clientes), 1)
+        self.assertEqual(self.janela_clientes.tabela.rowCount(), 1)
+        aviso.assert_called_once()
+
+    def test_18_acao_clientes_abre_janela(self):
+        with patch.object(JanelaClientes, "exec", return_value=0) as executar:
+            self.principal.acao_clientes.trigger()
+
+        executar.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

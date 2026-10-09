@@ -107,6 +107,20 @@ class JSONRepository:
             if caminho_temporario is not None:
                 caminho_temporario.unlink(missing_ok=True)
 
+    def excluir(self, tipo, registro_id):
+        self._obter_caminho(tipo)
+
+        if type(registro_id) is not int or registro_id <= 0:
+            raise ValueError("O ID do registro deve ser um inteiro positivo.")
+
+        registros = self.listar(tipo)
+        registros_novos = [registro for registro in registros if registro["id"] != registro_id]
+
+        if len(registros_novos) == len(registros):
+            raise LookupError("Registro não encontrado.")
+
+        self.salvar(tipo, registros_novos)
+
     def proximo_id(self, tipo):
         registros = self.listar(tipo)
 
