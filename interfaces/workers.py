@@ -4,7 +4,6 @@ from PySide6.QtCore import QThread, Signal
 class CarregamentoThread(QThread):
     concluido = Signal(object)
     erro = Signal(str)
-    nao_implementado = Signal()
 
     def __init__(self, funcao, parent=None):
         super().__init__(parent)
@@ -13,9 +12,6 @@ class CarregamentoThread(QThread):
     def run(self):
         try:
             resultado = self.funcao()
-
-        except NotImplementedError:
-            self.nao_implementado.emit()
 
         except (OSError, ValueError, LookupError, RuntimeError) as erro:
             self.erro.emit(str(erro))

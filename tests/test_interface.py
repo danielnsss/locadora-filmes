@@ -251,11 +251,11 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(self.cadastro.campo_nome.text(), "")
         mensagem.assert_called_once()
 
-    def test_10_servico_indisponivel_exibe_aviso(self):
+    def test_10_erro_no_servico_nao_emite_sinal_de_cliente(self):
         self.criar_janela_cadastro()
         self.cadastro.campo_nome.setText("Maria Silva")
         self.cadastro.campo_telefone.setText("011999999999")
-        self.locadora.erro_cliente = NotImplementedError("Serviço ainda não disponível.")
+        self.locadora.erro_cliente = OSError("Falha ao salvar cliente.")
 
         sinais = []
         self.cadastro.cliente_cadastrado.connect(lambda: sinais.append("cliente"))

@@ -66,7 +66,7 @@ class JanelaHistorico(QDialog):
         barra_botoes.addWidget(self.botao_devolver)
 
         botao_fechar = QPushButton("Fechar")
-        botao_fechar.clicked.connect(self.accept)
+        botao_fechar.clicked.connect(self.close)
         barra_botoes.addWidget(botao_fechar)
         layout.addLayout(barra_botoes)
 

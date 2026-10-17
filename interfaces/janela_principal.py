@@ -3,7 +3,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QToolBar
 
-from modelos.filme import Filme
 from interfaces.janela_aluguel import JanelaAluguel
 
 from interfaces.janela_cadastro import JanelaCadastro
@@ -156,7 +155,6 @@ class JanelaPrincipal(QMainWindow):
         self.thread_catalogo = thread
 
         thread.concluido.connect(self.catalogo_carregado)
-        thread.nao_implementado.connect(self.catalogo_demonstracao)
         thread.erro.connect(self.erro_carregamento_catalogo)
         thread.finished.connect(thread.deleteLater)
         thread.finished.connect(lambda: self.finalizar_thread_catalogo(thread))
@@ -170,16 +168,6 @@ class JanelaPrincipal(QMainWindow):
 
         mensagem = f"{len(self.filmes)} filme(s) encontrado(s)."
         self.statusBar().showMessage(mensagem)
-
-
-    def catalogo_demonstracao(self):
-        self.filmes = [
-            Filme(1, "Interestelar", "Ficção científica", 2014, "Uma viagem pelo espaço.", 5.0, 3),
-            Filme(2, "A Origem", "Ficção científica", 2010, "Um filme sobre sonhos.", 6.0, 2)
-        ]
-
-        self.pesquisar_filmes(self.campo_pesquisa.text())
-        self.statusBar().showMessage("Modo de demonstração: serviço ainda não implementado.")
 
 
     def erro_carregamento_catalogo(self, mensagem):
@@ -274,10 +262,6 @@ class JanelaPrincipal(QMainWindow):
         self.atualizar_catalogo()
         QMessageBox.information(self, "Filme excluído", "Filme excluído com sucesso.")
 
-    def abrir_detalhes_filme(self, linha, coluna):
-        titulo = self.tabela.item(linha, 0).text()
-        QMessageBox.information(self, "Filme selecionado", f"Filme: {titulo}\nA funcionalidade de aluguel será integrada posteriormente.")
-
     def exibir_sobre(self):
         QMessageBox.information(self, "Sobre", "Locadora de Filmes\nProjeto de Programação Orientada a Objetos II.")
 
@@ -286,7 +270,11 @@ class JanelaPrincipal(QMainWindow):
 
         if resposta == QMessageBox.StandardButton.Yes:
             if self.thread_catalogo is not None and self.thread_catalogo.isRunning():
-                self.thread_catalogo.wait(2000)
+                terminou = self.thread_catalogo.wait(2000)
+
+                if not terminou:
+                    evento.ignore()
+                    return
 
             evento.accept()
         else:

@@ -62,7 +62,6 @@ class JanelaClientes(QDialog):
         self.thread_clientes = thread
 
         thread.concluido.connect(self.clientes_carregados)
-        thread.nao_implementado.connect(self.clientes_indisponiveis)
         thread.erro.connect(self.erro_carregamento_clientes)
         thread.finished.connect(lambda: self.finalizar_thread_clientes(thread))
         thread.finished.connect(thread.deleteLater)
@@ -72,11 +71,6 @@ class JanelaClientes(QDialog):
     def clientes_carregados(self, clientes):
         self.clientes = clientes
         self.preencher_tabela()
-
-    def clientes_indisponiveis(self):
-        self.clientes = []
-        self.preencher_tabela()
-        QMessageBox.warning(self, "Serviço indisponível", "A consulta de clientes ainda não está disponível.")
 
     def erro_carregamento_clientes(self, mensagem):
         self.clientes = []

@@ -118,14 +118,9 @@ class JanelaCadastro(QDialog):
             return
 
         try:
-            metodo = getattr(self.locadora, "cadastrar_filme", None)
+            self.locadora.cadastrar_filme(titulo, genero, ano, sinopse, preco_diaria, quantidade_total)
 
-            if not callable(metodo):
-                raise NotImplementedError("O serviço de cadastro de filmes ainda não está disponível.")
-
-            metodo(titulo, genero, ano, sinopse, preco_diaria, quantidade_total)
-
-        except (ValueError, OSError, NotImplementedError) as erro:
+        except (ValueError, OSError) as erro:
             QMessageBox.warning(self, "Não foi possível cadastrar", str(erro))
             return
 
@@ -142,14 +137,9 @@ class JanelaCadastro(QDialog):
             return
 
         try:
-            metodo = getattr(self.locadora, "cadastrar_cliente", None)
+            self.locadora.cadastrar_cliente(nome, telefone)
 
-            if not callable(metodo):
-                raise NotImplementedError("O serviço de cadastro de clientes ainda não está disponível.")
-
-            metodo(nome, telefone)
-
-        except (ValueError, OSError, NotImplementedError) as erro:
+        except (ValueError, OSError) as erro:
             QMessageBox.warning(self, "Não foi possível cadastrar", str(erro))
             return
 

@@ -1,25 +1,6 @@
 CHANGELOG - TRABALHO 02
 Programação Orientada a Objetos II
 
-ENTREGA PARCIAL 1
-Data: 09/10/2026
-
-Alterações realizadas:
-
-- Implementada a exclusão de registros no repositório JSON.
-- Implementada a exclusão de filmes.
-- Implementada a consulta de clientes por identificador.
-- Implementada a exclusão de clientes.
-- Adicionadas validações para impedir a exclusão de filmes e clientes que possuem aluguéis registrados.
-- Adicionada a opção de exclusão de filmes na interface principal.
-- Criada uma nova janela para consulta dos clientes cadastrados.
-- Adicionada a opção de exclusão de clientes na nova janela de clientes.
-- Adicionadas mensagens de confirmação e de erro durante as operações de exclusão.
-- Atualização automática das tabelas após a exclusão de registros.
-- Adicionados testes automatizados para as novas funcionalidades.
-- Realizada a execução da suíte completa de testes, sem falhas.
-
-
 ENTREGA PARCIAL 2
 Data: 16/10/2026
 
@@ -28,11 +9,11 @@ Alterações realizadas:
 - Criada infraestrutura reutilizável para execução de tarefas em threads utilizando QThread.
 - Implementado carregamento do catálogo de filmes em thread secundária.
 - Implementado carregamento da lista de clientes em thread secundária.
-- Implementado carregamento do histórico de aluguéis em thread secundária.
-- Utilizados signals para enviar os resultados das threads para a interface gráfica.
+- Implementado carregamento do histórico de locações em thread secundária.
+- Utilizados sinais para enviar os resultados das threads para a interface gráfica.
 - Mantida a atualização dos widgets exclusivamente na thread principal.
 - Adicionado tratamento de erros durante o carregamento assíncrono dos dados.
-- Adicionado controle para evitar múltiplas threads de carregamento simultâneas na mesma janela.
+- Adicionado controle para evitar carregamentos simultâneos duplicados na mesma janela.
 - Adicionado tratamento no fechamento das janelas durante a execução das threads.
 - Adaptados os testes de interface para operações assíncronas.
 - Adicionados testes para verificar que os carregamentos são executados em threads diferentes da thread principal.
@@ -50,3 +31,23 @@ Arquivos principais modificados:
 Arquivo criado:
 
 - interfaces/workers.py
+
+
+
+ENTREGA PARCIAL 1
+Data: 09/10/2026
+
+Alterações realizadas:
+
+- Implementada a exclusão de registros no repositório JSON.
+- Implementada a exclusão de filmes.
+- Implementada a consulta de clientes por identificador.
+- Implementada a exclusão de clientes.
+- Adicionadas validações para impedir a exclusão de filmes e clientes que possuem aluguéis registrados.
+- Adicionada a opção de exclusão de filmes na interface principal.
+- Criada uma nova janela para consulta dos clientes cadastrados.
+- Adicionada a opção de exclusão de clientes na nova janela de clientes.
+- Adicionadas mensagens de confirmação e de erro durante as operações de exclusão.
+- Atualização automática das tabelas após a exclusão de registros.
+- Adicionados testes automatizados para as novas funcionalidades.
+- Realizada a execução da suíte completa de testes, sem falhas.
