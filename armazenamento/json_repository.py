@@ -89,7 +89,6 @@ class JSONRepository:
 
         self._validar_registros(registros, tipo)
 
-        # Impede sobrescrever silenciosamente um arquivo inválido.
         self.listar(tipo)
 
         caminho_temporario = None
