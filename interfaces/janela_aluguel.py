@@ -1,5 +1,7 @@
-
+from interfaces.workers import CarregamentoThread
 from PySide6.QtCore import Signal
+from interfaces.workers import CarregamentoThread
+
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -20,17 +22,28 @@ class JanelaAluguel(QDialog):
         super().__init__(parent)
 
         self.locadora = locadora
-        self.filme = self.locadora.obter_filme(filme_id)
-        self.clientes = self.locadora.listar_clientes()
+        self.filme_id = filme_id
+        self.filme = None
+        self.clientes = []
+
+        self.thread_dados = None
+        self.erro_dados = None
+
+        self.thread_aluguel = None
+        self.resultado_aluguel = None
+        self.erro_aluguel = None
 
         self.setWindowTitle("Aluguel de Filme")
         self.setMinimumWidth(450)
 
-        self.criar_interface()
-        self.atualizar_valor()
+        self.layout_principal = QVBoxLayout(self)
+        self.label_carregamento = QLabel("Carregando filme e clientes...")
+        self.layout_principal.addWidget(self.label_carregamento)
+
+        self.iniciar_carregamento()
 
     def criar_interface(self):
-        layout = QVBoxLayout(self)
+        layout = self.layout_principal
 
         titulo = QLabel("Alugar Filme")
         titulo.setStyleSheet("font-size: 22px; font-weight: bold;")
@@ -103,27 +116,143 @@ class JanelaAluguel(QDialog):
         self.label_valor.setText(self.formatar_moeda(valor))
 
     def confirmar_aluguel(self):
+        if self.thread_aluguel is not None:
+            return
+
         cliente_id = self.combo_clientes.currentData()
         dias = self.campo_dias.value()
 
         if cliente_id is None:
-            QMessageBox.warning(self, "Cliente obrigatório", "Selecione um cliente para realizar o aluguel.")
+            QMessageBox.warning(
+                self,
+                "Cliente obrigatório",
+                "Selecione um cliente para realizar o aluguel."
+            )
             return
 
-        resposta = QMessageBox.question(self, "Confirmar aluguel", f"Deseja alugar '{self.filme.titulo}' por {dias} dia(s)?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        resposta = QMessageBox.question(
+            self,
+            "Confirmar aluguel",
+            f"Deseja alugar '{self.filme.titulo}' por {dias} dia(s)?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
 
         if resposta != QMessageBox.StandardButton.Yes:
             return
 
-        try:
-            aluguel = self.locadora.alugar_filme(self.filme.id, cliente_id, dias)
+        filme_id = self.filme.id
 
-        except (ValueError, LookupError, OSError, RuntimeError) as erro:
-            QMessageBox.warning(self, "Não foi possível realizar o aluguel", str(erro))
+        thread = CarregamentoThread(
+            lambda: self.locadora.alugar_filme(filme_id, cliente_id, dias),
+            self
+        )
+
+        self.thread_aluguel = thread
+        self.resultado_aluguel = None
+        self.erro_aluguel = None
+
+        thread.concluido.connect(self.aluguel_concluido)
+        thread.erro.connect(self.erro_ao_alugar)
+        thread.finished.connect(self.finalizar_aluguel)
+        thread.finished.connect(thread.deleteLater)
+
+        self.setEnabled(False)
+        thread.start()
+
+
+    def aluguel_concluido(self, aluguel):
+        self.resultado_aluguel = aluguel
+
+
+    def erro_ao_alugar(self, mensagem):
+        self.erro_aluguel = mensagem
+
+
+    def finalizar_aluguel(self):
+        aluguel = self.resultado_aluguel
+        erro = self.erro_aluguel
+
+        self.thread_aluguel = None
+        self.resultado_aluguel = None
+        self.erro_aluguel = None
+
+        self.setEnabled(True)
+
+        if aluguel is not None:
+            self.aluguel_realizado.emit()
+
+            QMessageBox.information(
+                self,
+                "Aluguel realizado",
+                f"Aluguel #{aluguel.id} realizado com sucesso.\n"
+                f"Valor total: {self.formatar_moeda(aluguel.valor_total)}"
+            )
+
+            self.accept()
+
+        elif erro is not None:
+            QMessageBox.warning(
+                self,
+                "Não foi possível realizar o aluguel",
+                erro
+            )
+
+    def closeEvent(self, evento):
+        if self.thread_dados is not None or self.thread_aluguel is not None:
+            evento.ignore()
             return
 
-        self.aluguel_realizado.emit()
+        super().closeEvent(evento)
 
-        QMessageBox.information(self, "Aluguel realizado", f"Aluguel #{aluguel.id} realizado com sucesso.\nValor total: {self.formatar_moeda(aluguel.valor_total)}")
 
-        self.accept()
+    def reject(self):
+        if self.thread_dados is not None or self.thread_aluguel is not None:
+            return
+
+        super().reject()
+
+
+    def iniciar_carregamento(self):
+        thread = CarregamentoThread(self.carregar_dados, self)
+        self.thread_dados = thread
+
+        thread.concluido.connect(self.dados_carregados)
+        thread.erro.connect(self.erro_carregamento_dados)
+        thread.finished.connect(self.finalizar_carregamento_dados)
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+
+    def carregar_dados(self):
+        filme = self.locadora.obter_filme(self.filme_id)
+        clientes = self.locadora.listar_clientes()
+
+        return filme, clientes
+
+
+    def dados_carregados(self, dados):
+        self.filme, self.clientes = dados
+
+        self.layout_principal.removeWidget(self.label_carregamento)
+        self.label_carregamento.deleteLater()
+
+        self.criar_interface()
+        self.atualizar_valor()
+
+
+    def erro_carregamento_dados(self, mensagem):
+        self.erro_dados = mensagem
+
+
+    def finalizar_carregamento_dados(self):
+        self.thread_dados = None
+
+        if self.erro_dados is not None:
+            QMessageBox.warning(
+                self,
+                "Erro ao carregar aluguel",
+                self.erro_dados
+            )
+            self.reject()

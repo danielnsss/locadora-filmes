@@ -18,6 +18,10 @@ class JanelaPrincipal(QMainWindow):
         self.filmes = []
         self.thread_catalogo = None
 
+        self.thread_exclusao_filme = None
+        self.exclusao_filme_ok = False
+        self.exclusao_filme_erro = None
+
         self.setWindowTitle("Locadora de Filmes")
         self.resize(1000, 650)
 
@@ -227,45 +231,104 @@ class JanelaPrincipal(QMainWindow):
 
         janela.aluguel_realizado.connect(self.atualizar_catalogo)
         janela.exec()
-
     def excluir_filme(self):
+        if self.thread_exclusao_filme is not None:
+            return
+
         linha = self.tabela.currentRow()
 
         if linha < 0:
-            QMessageBox.warning(self, "Seleção obrigatória", "Selecione um filme para excluir.")
+            QMessageBox.warning(
+                self,
+                "Seleção obrigatória",
+                "Selecione um filme para excluir."
+            )
             return
 
         item = self.tabela.item(linha, 0)
 
         if item is None:
-            QMessageBox.warning(self, "Erro", "Não foi possível identificar o filme selecionado.")
+            QMessageBox.warning(
+                self,
+                "Erro",
+                "Não foi possível identificar o filme selecionado."
+            )
             return
 
         filme_id = item.data(Qt.ItemDataRole.UserRole)
 
         if filme_id is None:
-            QMessageBox.warning(self, "Erro", "O filme selecionado não possui um identificador válido.")
+            QMessageBox.warning(
+                self,
+                "Erro",
+                "O filme selecionado não possui um identificador válido."
+            )
             return
 
-        resposta = QMessageBox.question(self, "Excluir filme", f'Deseja realmente excluir o filme "{item.text()}"?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        resposta = QMessageBox.question(
+            self,
+            "Excluir filme",
+            f'Deseja realmente excluir o filme "{item.text()}"?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
 
         if resposta != QMessageBox.StandardButton.Yes:
             return
 
-        try:
-            self.locadora.excluir_filme(filme_id)
+        thread = CarregamentoThread(
+            lambda: self.locadora.excluir_filme(filme_id),
+            self
+        )
 
-        except (ValueError, LookupError, OSError) as erro:
-            QMessageBox.warning(self, "Erro ao excluir filme", str(erro))
-            return
+        self.thread_exclusao_filme = thread
+        self.exclusao_filme_ok = False
+        self.exclusao_filme_erro = None
 
-        self.atualizar_catalogo()
-        QMessageBox.information(self, "Filme excluído", "Filme excluído com sucesso.")
+        thread.concluido.connect(self.exclusao_filme_concluida)
+        thread.erro.connect(self.erro_exclusao_filme)
+        thread.finished.connect(self.finalizar_exclusao_filme)
+        thread.finished.connect(thread.deleteLater)
+
+        self.setEnabled(False)
+        thread.start()
+
+
+    def exclusao_filme_concluida(self, resultado):
+        self.exclusao_filme_ok = True
+
+
+    def erro_exclusao_filme(self, mensagem):
+        self.exclusao_filme_erro = mensagem
+
+
+    def finalizar_exclusao_filme(self):
+        self.thread_exclusao_filme = None
+        self.setEnabled(True)
+
+        if self.exclusao_filme_ok:
+            self.atualizar_catalogo()
+
+            QMessageBox.information(
+                self,
+                "Filme excluído",
+                "Filme excluído com sucesso."
+            )
+
+        elif self.exclusao_filme_erro is not None:
+            QMessageBox.warning(
+                self,
+                "Erro ao excluir filme",
+                self.exclusao_filme_erro
+            )
 
     def exibir_sobre(self):
         QMessageBox.information(self, "Sobre", "Locadora de Filmes\nProjeto de Programação Orientada a Objetos II.")
 
     def closeEvent(self, evento):
+        if self.thread_exclusao_filme is not None:
+            evento.ignore()
+            return
         resposta = QMessageBox.question(self, "Sair", "Deseja realmente fechar a aplicação?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
         if resposta == QMessageBox.StandardButton.Yes:

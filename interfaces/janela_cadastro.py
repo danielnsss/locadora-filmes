@@ -1,5 +1,6 @@
 
 from datetime import date
+from interfaces.workers import CarregamentoThread
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QTabWidget, QWidget, QLabel, QLineEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QPushButton, QMessageBox
@@ -13,6 +14,9 @@ class JanelaCadastro(QDialog):
         super().__init__(parent)
 
         self.locadora = locadora
+
+        self.thread_operacao = None
+        self.tipo_operacao = None
 
         self.setWindowTitle("Cadastro - Locadora de Filmes")
         self.setMinimumWidth(500)
@@ -33,9 +37,9 @@ class JanelaCadastro(QDialog):
 
         layout.addWidget(self.abas)
 
-        botao_fechar = QPushButton("Fechar")
-        botao_fechar.clicked.connect(self.close)
-        layout.addWidget(botao_fechar)
+        self.botao_fechar = QPushButton("Fechar")
+        self.botao_fechar.clicked.connect(self.close)
+        layout.addWidget(self.botao_fechar)
 
     def criar_aba_filmes(self):
         pagina = QWidget()
@@ -75,9 +79,9 @@ class JanelaCadastro(QDialog):
 
         layout.addLayout(formulario)
 
-        botao_cadastrar = QPushButton("Cadastrar filme")
-        botao_cadastrar.clicked.connect(self.cadastrar_filme)
-        layout.addWidget(botao_cadastrar)
+        self.botao_cadastrar_filme = QPushButton("Cadastrar filme")
+        self.botao_cadastrar_filme.clicked.connect(self.cadastrar_filme)
+        layout.addWidget(self.botao_cadastrar_filme)
 
         layout.addStretch()
         return pagina
@@ -98,9 +102,9 @@ class JanelaCadastro(QDialog):
 
         layout.addLayout(formulario)
 
-        botao_cadastrar = QPushButton("Cadastrar cliente")
-        botao_cadastrar.clicked.connect(self.cadastrar_cliente)
-        layout.addWidget(botao_cadastrar)
+        self.botao_cadastrar_cliente = QPushButton("Cadastrar cliente")
+        self.botao_cadastrar_cliente.clicked.connect(self.cadastrar_cliente)
+        layout.addWidget(self.botao_cadastrar_cliente)
 
         layout.addStretch()
         return pagina
@@ -117,16 +121,13 @@ class JanelaCadastro(QDialog):
             QMessageBox.warning(self, "Campos obrigatórios", "Informe o título e o gênero do filme.")
             return
 
-        try:
-            self.locadora.cadastrar_filme(titulo, genero, ano, sinopse, preco_diaria, quantidade_total)
+        self.iniciar_operacao(
+            "filme",
+            lambda: self.locadora.cadastrar_filme(
+                titulo, genero, ano, sinopse, preco_diaria, quantidade_total
+            )
+        )
 
-        except (ValueError, OSError) as erro:
-            QMessageBox.warning(self, "Não foi possível cadastrar", str(erro))
-            return
-
-        self.filme_cadastrado.emit()
-        QMessageBox.information(self, "Cadastro realizado", "Filme cadastrado com sucesso.")
-        self.limpar_campos_filme()
 
     def cadastrar_cliente(self):
         nome = self.campo_nome.text().strip()
@@ -136,16 +137,11 @@ class JanelaCadastro(QDialog):
             QMessageBox.warning(self, "Campos obrigatórios", "Informe o nome e o telefone do cliente.")
             return
 
-        try:
-            self.locadora.cadastrar_cliente(nome, telefone)
+        self.iniciar_operacao(
+            "cliente",
+            lambda: self.locadora.cadastrar_cliente(nome, telefone)
+        )
 
-        except (ValueError, OSError) as erro:
-            QMessageBox.warning(self, "Não foi possível cadastrar", str(erro))
-            return
-
-        self.cliente_cadastrado.emit()
-        QMessageBox.information(self, "Cadastro realizado", "Cliente cadastrado com sucesso.")
-        self.limpar_campos_cliente()
 
     def limpar_campos_filme(self):
         self.campo_titulo.clear()
@@ -160,3 +156,72 @@ class JanelaCadastro(QDialog):
         self.campo_nome.clear()
         self.campo_telefone.clear()
         self.campo_nome.setFocus()
+
+    def iniciar_operacao(self, tipo, funcao):
+        if self.thread_operacao is not None:
+            return
+
+        self.tipo_operacao = tipo
+        thread = CarregamentoThread(funcao, self)
+        self.thread_operacao = thread
+
+        self.abas.setEnabled(False)
+        self.botao_fechar.setEnabled(False)
+
+        thread.concluido.connect(self.operacao_concluida)
+        thread.erro.connect(self.erro_operacao)
+        thread.finished.connect(self.finalizar_operacao)
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+
+    def operacao_concluida(self, resultado):
+        if self.tipo_operacao == "filme":
+            self.filme_cadastrado.emit()
+            self.limpar_campos_filme()
+            QMessageBox.information(
+                self,
+                "Cadastro realizado",
+                "Filme cadastrado com sucesso."
+            )
+
+        elif self.tipo_operacao == "cliente":
+            self.cliente_cadastrado.emit()
+            self.limpar_campos_cliente()
+            QMessageBox.information(
+                self,
+                "Cadastro realizado",
+                "Cliente cadastrado com sucesso."
+            )
+
+
+    def erro_operacao(self, mensagem):
+        QMessageBox.warning(
+            self,
+            "Não foi possível cadastrar",
+            mensagem
+        )
+
+
+    def finalizar_operacao(self):
+        self.thread_operacao = None
+        self.tipo_operacao = None
+
+        self.abas.setEnabled(True)
+        self.botao_fechar.setEnabled(True)
+
+
+    def closeEvent(self, evento):
+        if self.thread_operacao is not None:
+            evento.ignore()
+            return
+
+        super().closeEvent(evento)
+
+
+    def reject(self):
+        if self.thread_operacao is not None:
+            return
+
+        super().reject()

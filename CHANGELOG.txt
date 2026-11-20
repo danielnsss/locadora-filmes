@@ -1,53 +1,51 @@
-CHANGELOG - TRABALHO 02
+CHANGELOG - TRABALHO 03
 Programação Orientada a Objetos II
 
 ENTREGA PARCIAL 2
-Data: 16/10/2026
+Data: 20/11/2026
 
 Alterações realizadas:
 
-- Criada infraestrutura reutilizável para execução de tarefas em threads utilizando QThread.
-- Implementado carregamento do catálogo de filmes em thread secundária.
-- Implementado carregamento da lista de clientes em thread secundária.
-- Implementado carregamento do histórico de locações em thread secundária.
-- Utilizados sinais para enviar os resultados das threads para a interface gráfica.
-- Mantida a atualização dos widgets exclusivamente na thread principal.
-- Adicionado tratamento de erros durante o carregamento assíncrono dos dados.
-- Adicionado controle para evitar carregamentos simultâneos duplicados na mesma janela.
-- Adicionado tratamento no fechamento das janelas durante a execução das threads.
-- Adaptados os testes de interface para operações assíncronas.
-- Adicionados testes para verificar que os carregamentos são executados em threads diferentes da thread principal.
-- Realizada a execução da suíte completa com 86 testes, sem falhas.
+- Implementado armazenamento principal dos dados em PostgreSQL, substituindo o uso de arquivos JSON na execução da aplicação.
+- Criada a modelagem das tabelas de filmes, clientes e aluguéis com SQLAlchemy.
+- Configurada a execução do PostgreSQL e da API em contêineres Docker.
+- Desenvolvida API REST com FastAPI para as operações da locadora.
+- Implementada comunicação HTTP entre a interface PySide6 e a API.
+- Adaptada a inicialização da aplicação para utilizar o serviço remoto LocadoraRemota.
+- Adaptadas as janelas para executar operações de cadastro, exclusão, aluguel e devolução em threads secundárias.
+- Adicionado tratamento de erros de conexão e de respostas da API.
+- Implementado controle de transações e concorrência nos aluguéis e nas devoluções.
+- Configurado o acesso à API pela rede local.
+- Adaptados os testes da interface e adicionados 10 testes de integração, transações e concorrência.
 
 
 Arquivos principais modificados:
 
+- main.py
 - interfaces/janela_principal.py
+- interfaces/janela_cadastro.py
 - interfaces/janela_clientes.py
+- interfaces/janela_aluguel.py
 - interfaces/janela_historico.py
 - tests/test_interface.py
 - tests/test_historico.py
 
-Arquivo criado:
+Arquivos criados:
 
-- interfaces/workers.py
-
-
-
-ENTREGA PARCIAL 1
-Data: 09/10/2026
-
-Alterações realizadas:
-
-- Implementada a exclusão de registros no repositório JSON.
-- Implementada a exclusão de filmes.
-- Implementada a consulta de clientes por identificador.
-- Implementada a exclusão de clientes.
-- Adicionadas validações para impedir a exclusão de filmes e clientes que possuem aluguéis registrados.
-- Adicionada a opção de exclusão de filmes na interface principal.
-- Criada uma nova janela para consulta dos clientes cadastrados.
-- Adicionada a opção de exclusão de clientes na nova janela de clientes.
-- Adicionadas mensagens de confirmação e de erro durante as operações de exclusão.
-- Atualização automática das tabelas após a exclusão de registros.
-- Adicionados testes automatizados para as novas funcionalidades.
-- Realizada a execução da suíte completa de testes, sem falhas.
+- api/main.py
+- api/dependencias.py
+- api/esquemas.py
+- api/rotas/filmes.py
+- api/rotas/clientes.py
+- api/rotas/alugueis.py
+- banco/conexao.py
+- banco/modelos_db.py
+- banco/repositorios.py
+- servicos/locadora_remota.py
+- compose.yaml
+- Dockerfile.api
+- requirements-cliente.txt
+- requirements-servidor.txt
+- tests/integracao_api.py
+- tests/integracao_transacoes.py
+- tests/integracao_concorrencia.py

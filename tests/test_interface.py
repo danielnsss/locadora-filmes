@@ -110,34 +110,52 @@ class TestInterface(unittest.TestCase):
         self.aguardar_catalogo()
 
     def tearDown(self):
-        if self.cadastro is not None:
-            self.cadastro.close()
+        with patch("interfaces.janela_cadastro.QMessageBox.information"), \
+             patch("interfaces.janela_cadastro.QMessageBox.warning"), \
+             patch("interfaces.janela_principal.QMessageBox.information"), \
+             patch("interfaces.janela_principal.QMessageBox.warning"), \
+             patch("interfaces.janela_clientes.QMessageBox.information"), \
+             patch("interfaces.janela_clientes.QMessageBox.warning"):
+            if self.cadastro is not None:
+                self.aguardar_cadastro()
+                self.cadastro.close()
 
-        if self.janela_clientes is not None:
-            self.janela_clientes.close()
+            if self.janela_clientes is not None:
+                self.aguardar_exclusao_cliente()
+                self.aguardar_clientes()
+                self.janela_clientes.close()
 
-        with patch("interfaces.janela_principal.QMessageBox.question", return_value=16384):
-            self.principal.close()
+            self.aguardar_exclusao_filme()
+            self.aguardar_catalogo()
+
+            with patch("interfaces.janela_principal.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+                self.principal.close()
+
+            self.app.processEvents()
+
+    def aguardar_thread(self, janela, atributo, descricao):
+        thread = getattr(janela, atributo, None)
+
+        if thread is not None:
+            terminou = thread.wait(5000)
+            self.assertTrue(terminou, f"A thread de {descricao} não terminou no tempo esperado.")
 
         self.app.processEvents()
 
     def aguardar_catalogo(self):
-        thread = self.principal.thread_catalogo
-
-        if thread is not None:
-            terminou = thread.wait(2000)
-            self.assertTrue(terminou, "A thread do catálogo não terminou no tempo esperado.")
-
-        self.app.processEvents()
+        self.aguardar_thread(self.principal, "thread_catalogo", "catálogo")
 
     def aguardar_clientes(self):
-        thread = self.janela_clientes.thread_clientes
+        self.aguardar_thread(self.janela_clientes, "thread_clientes", "clientes")
 
-        if thread is not None:
-            terminou = thread.wait(2000)
-            self.assertTrue(terminou, "A thread de clientes não terminou no tempo esperado.")
+    def aguardar_cadastro(self):
+        self.aguardar_thread(self.cadastro, "thread_operacao", "cadastro")
 
-        self.app.processEvents()
+    def aguardar_exclusao_filme(self):
+        self.aguardar_thread(self.principal, "thread_exclusao_filme", "exclusão de filme")
+
+    def aguardar_exclusao_cliente(self):
+        self.aguardar_thread(self.janela_clientes, "thread_exclusao_cliente", "exclusão de cliente")
 
     def criar_janela_cadastro(self):
         self.cadastro = JanelaCadastro(self.locadora, self.principal)
@@ -203,6 +221,7 @@ class TestInterface(unittest.TestCase):
 
         with patch("interfaces.janela_cadastro.QMessageBox.information") as mensagem:
             self.clicar_botao("Cadastrar filme")
+            self.aguardar_cadastro()
 
         self.assertEqual(len(self.locadora.filmes), 3)
         self.assertEqual(self.locadora.filmes[-1].titulo, "Matrix")
@@ -220,6 +239,7 @@ class TestInterface(unittest.TestCase):
 
         with patch("interfaces.janela_cadastro.QMessageBox.warning") as aviso:
             self.clicar_botao("Cadastrar filme")
+            self.aguardar_cadastro()
 
         self.assertEqual(len(self.locadora.filmes), 2)
         self.assertEqual(sinais, [])
@@ -244,6 +264,7 @@ class TestInterface(unittest.TestCase):
 
         with patch("interfaces.janela_cadastro.QMessageBox.information") as mensagem:
             self.clicar_botao("Cadastrar cliente")
+            self.aguardar_cadastro()
 
         self.assertEqual(len(self.locadora.clientes), 1)
         self.assertEqual(self.locadora.clientes[0].telefone, "011999999999")
@@ -262,6 +283,7 @@ class TestInterface(unittest.TestCase):
 
         with patch("interfaces.janela_cadastro.QMessageBox.warning") as aviso:
             self.clicar_botao("Cadastrar cliente")
+            self.aguardar_cadastro()
 
         self.assertEqual(len(self.locadora.clientes), 0)
         self.assertEqual(sinais, [])
@@ -274,6 +296,7 @@ class TestInterface(unittest.TestCase):
 
         with patch("interfaces.janela_cadastro.QMessageBox.information"):
             self.clicar_botao("Cadastrar filme")
+            self.aguardar_cadastro()
 
         self.aguardar_catalogo()
 
@@ -297,8 +320,8 @@ class TestInterface(unittest.TestCase):
         with patch("interfaces.janela_principal.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
             with patch("interfaces.janela_principal.QMessageBox.information") as mensagem:
                 self.principal.excluir_filme()
-
-        self.aguardar_catalogo()
+                self.aguardar_exclusao_filme()
+                self.aguardar_catalogo()
 
         self.assertEqual(len(self.locadora.filmes), 1)
         self.assertEqual(self.locadora.filmes[0].titulo, "A Origem")
@@ -334,8 +357,8 @@ class TestInterface(unittest.TestCase):
         with patch("interfaces.janela_clientes.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
             with patch("interfaces.janela_clientes.QMessageBox.information") as mensagem:
                 self.janela_clientes.excluir_cliente()
-
-        self.aguardar_clientes()
+                self.aguardar_exclusao_cliente()
+                self.aguardar_clientes()
 
         self.assertEqual(self.locadora.clientes, [])
         self.assertEqual(self.janela_clientes.tabela.rowCount(), 0)
@@ -352,6 +375,7 @@ class TestInterface(unittest.TestCase):
         with patch("interfaces.janela_clientes.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
             with patch("interfaces.janela_clientes.QMessageBox.warning") as aviso:
                 self.janela_clientes.excluir_cliente()
+                self.aguardar_exclusao_cliente()
 
         self.assertEqual(len(self.locadora.clientes), 1)
         self.assertEqual(self.janela_clientes.tabela.rowCount(), 1)

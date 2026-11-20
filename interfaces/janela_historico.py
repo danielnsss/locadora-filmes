@@ -13,6 +13,11 @@ class JanelaHistorico(QDialog):
 
         self.locadora = locadora
         self.thread_historico = None
+
+        self.thread_devolucao = None
+        self.devolucao_ok = False
+        self.erro_devolucao = None
+
         self.setWindowTitle("Histórico de Locações")
         self.resize(1050, 540)
         self.criar_interface()
@@ -149,39 +154,117 @@ class JanelaHistorico(QDialog):
         item_status = self.tabela.item(linha, 7) if linha >= 0 else None
         self.botao_devolver.setEnabled(item_status is not None and item_status.data(Qt.ItemDataRole.UserRole) == "ativo")
 
+
     def confirmar_devolucao(self):
+        if self.thread_devolucao is not None:
+            return
+
+        if self.thread_historico is not None and self.thread_historico.isRunning():
+            return
+
         linhas = self.tabela.selectionModel().selectedRows()
         linha = linhas[0].row() if linhas else -1
+
         item_id = self.tabela.item(linha, 0) if linha >= 0 else None
         item_status = self.tabela.item(linha, 7) if linha >= 0 else None
 
         if item_id is None or item_status is None or item_status.data(Qt.ItemDataRole.UserRole) != "ativo":
-            QMessageBox.warning(self, "Seleção obrigatória", "Selecione um aluguel ativo para realizar a devolução.")
+            QMessageBox.warning(
+                self,
+                "Seleção obrigatória",
+                "Selecione um aluguel ativo para realizar a devolução."
+            )
             return
 
         aluguel_id = item_id.data(Qt.ItemDataRole.UserRole)
-        resposta = QMessageBox.question(self, "Confirmar devolução", f"Deseja devolver o filme do aluguel #{aluguel_id}?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+
+        resposta = QMessageBox.question(
+            self,
+            "Confirmar devolução",
+            f"Deseja devolver o filme do aluguel #{aluguel_id}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
 
         if resposta != QMessageBox.StandardButton.Yes:
             return
 
-        try:
-            self.locadora.devolver_filme(aluguel_id)
+        thread = CarregamentoThread(
+            lambda: self.locadora.devolver_filme(aluguel_id),
+            self
+        )
 
-        except (OSError, ValueError, LookupError, RuntimeError) as erro:
-            QMessageBox.warning(self, "Não foi possível devolver", str(erro))
-            return
+        self.thread_devolucao = thread
+        self.devolucao_ok = False
+        self.erro_devolucao = None
 
-        self.devolucao_realizada.emit()
-        self.atualizar_tabela()
-        QMessageBox.information(self, "Devolução realizada", "Filme devolvido com sucesso.")
+        thread.concluido.connect(self.devolucao_concluida)
+        thread.erro.connect(self.erro_ao_devolver)
+        thread.finished.connect(self.finalizar_devolucao)
+        thread.finished.connect(thread.deleteLater)
+
+        self.setEnabled(False)
+        thread.start()
+
+
+    def devolucao_concluida(self, aluguel):
+        self.devolucao_ok = True
+
+
+    def erro_ao_devolver(self, mensagem):
+        self.erro_devolucao = mensagem
+
+
+    def finalizar_devolucao(self):
+        sucesso = self.devolucao_ok
+        erro = self.erro_devolucao
+
+        self.thread_devolucao = None
+        self.devolucao_ok = False
+        self.erro_devolucao = None
+
+        self.setEnabled(True)
+
+        if sucesso:
+            self.botao_devolver.setEnabled(False)
+            self.devolucao_realizada.emit()
+            self.atualizar_tabela()
+
+            QMessageBox.information(
+                self,
+                "Devolução realizada",
+                "Filme devolvido com sucesso."
+            )
+
+        elif erro is not None:
+            QMessageBox.warning(
+                self,
+                "Não foi possível devolver",
+                erro
+            )
+
+
 
     def closeEvent(self, evento):
-        if self.thread_historico is not None and self.thread_historico.isRunning():
-            terminou = self.thread_historico.wait(2000)
+        historico_ativo = (
+            self.thread_historico is not None
+            and self.thread_historico.isRunning()
+        )
 
-            if not terminou:
-                evento.ignore()
-                return
+        if self.thread_devolucao is not None or historico_ativo:
+            evento.ignore()
+            return
 
-        evento.accept()
+        super().closeEvent(evento)
+
+
+    def reject(self):
+        historico_ativo = (
+            self.thread_historico is not None
+            and self.thread_historico.isRunning()
+        )
+
+        if self.thread_devolucao is not None or historico_ativo:
+            return
+
+        super().reject()

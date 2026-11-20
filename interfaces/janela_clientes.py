@@ -12,6 +12,10 @@ class JanelaClientes(QDialog):
         self.clientes = []
         self.thread_clientes = None
 
+        self.thread_exclusao_cliente = None
+        self.exclusao_cliente_ok = False
+        self.exclusao_cliente_erro = None
+
         self.setWindowTitle("Clientes - Locadora de Filmes")
         self.resize(650, 450)
 
@@ -96,46 +100,109 @@ class JanelaClientes(QDialog):
             self.tabela.setItem(linha, 2, item_telefone)
 
     def excluir_cliente(self):
+        if self.thread_exclusao_cliente is not None:
+            return
+
+        if self.thread_clientes is not None:
+            return
+
         linha = self.tabela.currentRow()
 
         if linha < 0:
-            QMessageBox.warning(self, "Seleção obrigatória", "Selecione um cliente para excluir.")
+            QMessageBox.warning(
+                self,
+                "Seleção obrigatória",
+                "Selecione um cliente para excluir."
+            )
             return
 
         item_id = self.tabela.item(linha, 0)
         item_nome = self.tabela.item(linha, 1)
 
         if item_id is None or item_nome is None:
-            QMessageBox.warning(self, "Erro", "Não foi possível identificar o cliente selecionado.")
+            QMessageBox.warning(
+                self,
+                "Erro",
+                "Não foi possível identificar o cliente selecionado."
+            )
             return
 
         cliente_id = item_id.data(Qt.ItemDataRole.UserRole)
 
         if cliente_id is None:
-            QMessageBox.warning(self, "Erro", "O cliente selecionado não possui um identificador válido.")
+            QMessageBox.warning(
+                self,
+                "Erro",
+                "O cliente selecionado não possui um identificador válido."
+            )
             return
 
-        resposta = QMessageBox.question(self, "Excluir cliente", f'Deseja realmente excluir o cliente "{item_nome.text()}"?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        resposta = QMessageBox.question(
+            self,
+            "Excluir cliente",
+            f'Deseja realmente excluir o cliente "{item_nome.text()}"?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
 
         if resposta != QMessageBox.StandardButton.Yes:
             return
 
-        try:
-            self.locadora.excluir_cliente(cliente_id)
+        thread = CarregamentoThread(
+            lambda: self.locadora.excluir_cliente(cliente_id),
+            self
+        )
 
-        except (ValueError, LookupError, OSError) as erro:
-            QMessageBox.warning(self, "Erro ao excluir cliente", str(erro))
-            return
+        self.thread_exclusao_cliente = thread
+        self.exclusao_cliente_ok = False
+        self.exclusao_cliente_erro = None
 
-        self.atualizar_clientes()
-        QMessageBox.information(self, "Cliente excluído", "Cliente excluído com sucesso.")
+        thread.concluido.connect(self.exclusao_cliente_concluida)
+        thread.erro.connect(self.erro_exclusao_cliente)
+        thread.finished.connect(self.finalizar_exclusao_cliente)
+        thread.finished.connect(thread.deleteLater)
+
+        self.setEnabled(False)
+        thread.start()
+
+    def exclusao_cliente_concluida(self, resultado):
+        self.exclusao_cliente_ok = True
+
+
+    def erro_exclusao_cliente(self, mensagem):
+        self.exclusao_cliente_erro = mensagem
+
+
+    def finalizar_exclusao_cliente(self):
+        self.thread_exclusao_cliente = None
+        self.setEnabled(True)
+
+        if self.exclusao_cliente_ok:
+            self.atualizar_clientes()
+
+            QMessageBox.information(
+                self,
+                "Cliente excluído",
+                "Cliente excluído com sucesso."
+            )
+
+        elif self.exclusao_cliente_erro is not None:
+            QMessageBox.warning(
+                self,
+                "Erro ao excluir cliente",
+                self.exclusao_cliente_erro
+            )
+
 
     def closeEvent(self, evento):
-        if self.thread_clientes is not None and self.thread_clientes.isRunning():
-            terminou = self.thread_clientes.wait(2000)
+        if self.thread_exclusao_cliente is not None or self.thread_clientes is not None:
+            evento.ignore()
+            return
 
-            if not terminou:
-                evento.ignore()
-                return
+        super().closeEvent(evento)
 
-        evento.accept()
+    def reject(self):
+        if self.thread_exclusao_cliente is not None or self.thread_clientes is not None:
+            return
+
+        super().reject()

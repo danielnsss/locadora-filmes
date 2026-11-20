@@ -1,15 +1,16 @@
+
 import sys
 
 from PySide6.QtWidgets import QApplication
 
-from servicos.locadora import Locadora
+from servicos.locadora_remota import LocadoraRemota
 from interfaces.janela_principal import JanelaPrincipal
 
 
 def main():
     app = QApplication(sys.argv)
 
-    locadora = Locadora()
+    locadora = LocadoraRemota()
     janela = JanelaPrincipal(locadora)
 
     janela.show()

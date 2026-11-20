@@ -74,6 +74,13 @@ class TestJanelaHistorico(unittest.TestCase):
 
         self.app.processEvents()
 
+    def aguardar_devolucao(self):
+        thread = self.janela.thread_devolucao
+        self.assertIsNotNone(thread, "A thread de devolução não foi iniciada.")
+        terminou = thread.wait(2000)
+        self.assertTrue(terminou, "A thread de devolução não terminou no tempo esperado.")
+        self.app.processEvents()
+
     def tearDown(self):
         self.janela.close()
         self.app.processEvents()
@@ -120,8 +127,8 @@ class TestJanelaHistorico(unittest.TestCase):
         with patch("interfaces.janela_historico.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
             with patch("interfaces.janela_historico.QMessageBox.information"):
                 self.janela.confirmar_devolucao()
-
-        self.aguardar_historico()
+                self.aguardar_devolucao()
+                self.aguardar_historico()
 
         self.assertEqual(self.locadora.devolvidos, [1])
         self.assertEqual(sinais, [True])
@@ -137,6 +144,7 @@ class TestJanelaHistorico(unittest.TestCase):
         with patch("interfaces.janela_historico.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
             with patch("interfaces.janela_historico.QMessageBox.warning") as aviso:
                 self.janela.confirmar_devolucao()
+                self.aguardar_devolucao()
 
         aviso.assert_called_once()
         self.assertEqual(sinais, [])
